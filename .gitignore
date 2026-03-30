@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Test, coverage, and build outputs
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+
+# Environment files
+.env
+.env.*
+
+# Logs
+*.log
+
+# Node/npm (if frontend is added)
+node_modules/
+
+# Misc
+*.sqlite3
+*.db
+
+# Ignore system files
+Thumbs.db

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
@@ -12,8 +12,7 @@ class User(UserBase):
     id: int
     created_at: datetime
     updated_at: datetime
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class HabitBase(BaseModel):
     name: str
@@ -27,8 +26,7 @@ class Habit(HabitBase):
     user_id: int
     created_at: datetime
     updated_at: datetime
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class HabitTrackingBase(BaseModel):
     date: datetime
@@ -41,5 +39,4 @@ class HabitTrackingCreate(HabitTrackingBase):
 class HabitTracking(HabitTrackingBase):
     id: int
     habit_id: int
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)

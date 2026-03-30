@@ -1,18 +1,23 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from . import models, schemas, database, auth
+import os
 from sqlalchemy.future import select
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import JWTError
 from typing import List
 from datetime import datetime
 
-app = FastAPI()
+from contextlib import asynccontextmanager
 
-@app.on_event("startup")
-async def startup():
-    async with database.engine.begin() as conn:
-        await conn.run_sync(models.Base.metadata.create_all)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if os.getenv("TESTING") != "1":
+        async with database.engine.begin() as conn:
+            await conn.run_sync(models.Base.metadata.create_all)
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 @app.post("/auth/register", response_model=schemas.User)
 async def register(user: schemas.UserCreate, db: AsyncSession = Depends(database.get_db)):

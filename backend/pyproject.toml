@@ -1,24 +1,28 @@
-# Uv configuration for FastAPI backend
-
 [project]
 name = "habit-tracker-backend"
-description = "FastAPI backend for the Habit Tracker app"
 version = "0.1.0"
+description = "FastAPI backend for the Habit Tracker app"
 requires-python = ">=3.9"
 
-[dependencies]
-fastapi = "*"
-udantic = "*"
-sqlalchemy = "*"
-asyncpg = "*"
-python-jose = "*"
-passlib = {extras = ["bcrypt"], version = "*"}
-python-dotenv = "*"
-uvicorn = "*"
+dependencies = [
+    "fastapi",
+    "pydantic",
+    "sqlalchemy",
+    "asyncpg",
+    "python-jose",
+    "passlib[argon2]>=1.7.4,<1.8",
+    "argon2-cffi",
+    "python-dotenv",
+    "email-validator",
+    "python-multipart",
+    "uvicorn"
+]
 
-[dev-dependencies]
-pytest = "*"
-httpx = "*"
-
-[tool.uv]
-virtualenvs.in-project = true
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "httpx",
+    "pytest-asyncio",
+    "aiosqlite",
+    "greenlet",
+]
