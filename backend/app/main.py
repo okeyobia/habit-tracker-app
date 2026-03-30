@@ -7,6 +7,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from jose import JWTError
 from typing import List
 from datetime import datetime
+import logging
 
 from contextlib import asynccontextmanager
 
@@ -16,6 +17,11 @@ async def lifespan(app: FastAPI):
         async with database.engine.begin() as conn:
             await conn.run_sync(models.Base.metadata.create_all)
     yield
+
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(lifespan=lifespan)
 
@@ -49,67 +55,123 @@ async def read_users_me(token: str = Depends(auth.oauth2_scheme), db: AsyncSessi
 
 @app.post("/habits/", response_model=schemas.Habit)
 async def create_habit(habit: schemas.HabitCreate, token: str = Depends(auth.oauth2_scheme), db: AsyncSession = Depends(database.get_db)):
-    email = auth.get_current_user(token, db)
-    user = await auth.get_user_by_email(db, email)
-    new_habit = models.Habit(user_id=user.id, **habit.dict())
-    db.add(new_habit)
-    await db.commit()
-    await db.refresh(new_habit)
-    return new_habit
+    try:
+        email = auth.get_current_user(token, db)
+        user = await auth.get_user_by_email(db, email)
+        if not user:
+            logger.warning(f"User not found for email: {email}")
+            raise HTTPException(status_code=404, detail="User not found")
+        if not habit.name:
+            logger.warning("Habit name is required.")
+            raise HTTPException(status_code=422, detail="Habit name is required.")
+        new_habit = models.Habit(user_id=user.id, **habit.dict())
+        db.add(new_habit)
+        await db.commit()
+        await db.refresh(new_habit)
+        logger.info(f"Habit created: {new_habit.id} for user {user.id}")
+        return new_habit
+    except Exception as e:
+        logger.error(f"Error creating habit: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.get("/habits/", response_model=List[schemas.Habit])
 async def list_habits(token: str = Depends(auth.oauth2_scheme), db: AsyncSession = Depends(database.get_db)):
-    email = auth.get_current_user(token, db)
-    user = await auth.get_user_by_email(db, email)
-    result = await db.execute(select(models.Habit).where(models.Habit.user_id == user.id))
-    return result.scalars().all()
+    try:
+        email = auth.get_current_user(token, db)
+        user = await auth.get_user_by_email(db, email)
+        if not user:
+            logger.warning(f"User not found for email: {email}")
+            raise HTTPException(status_code=404, detail="User not found")
+        result = await db.execute(select(models.Habit).where(models.Habit.user_id == user.id))
+        habits = result.scalars().all()
+        logger.info(f"Listed {len(habits)} habits for user {user.id}")
+        return habits
+    except Exception as e:
+        logger.error(f"Error listing habits: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.get("/habits/{habit_id}", response_model=schemas.Habit)
 async def get_habit(habit_id: int, token: str = Depends(auth.oauth2_scheme), db: AsyncSession = Depends(database.get_db)):
-    email = auth.get_current_user(token, db)
-    user = await auth.get_user_by_email(db, email)
-    result = await db.execute(select(models.Habit).where(models.Habit.id == habit_id, models.Habit.user_id == user.id))
-    habit = result.scalars().first()
-    if not habit:
-        raise HTTPException(status_code=404, detail="Habit not found")
-    return habit
+    try:
+        email = auth.get_current_user(token, db)
+        user = await auth.get_user_by_email(db, email)
+        if not user:
+            logger.warning(f"User not found for email: {email}")
+            raise HTTPException(status_code=404, detail="User not found")
+        result = await db.execute(select(models.Habit).where(models.Habit.id == habit_id, models.Habit.user_id == user.id))
+        habit = result.scalars().first()
+        if not habit:
+            logger.warning(f"Habit {habit_id} not found for user {user.id}")
+            raise HTTPException(status_code=404, detail="Habit not found")
+        logger.info(f"Fetched habit {habit_id} for user {user.id}")
+        return habit
+    except Exception as e:
+        logger.error(f"Error fetching habit: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.put("/habits/{habit_id}", response_model=schemas.Habit)
 async def update_habit(habit_id: int, habit: schemas.HabitCreate, token: str = Depends(auth.oauth2_scheme), db: AsyncSession = Depends(database.get_db)):
-    email = auth.get_current_user(token, db)
-    user = await auth.get_user_by_email(db, email)
-    result = await db.execute(select(models.Habit).where(models.Habit.id == habit_id, models.Habit.user_id == user.id))
-    db_habit = result.scalars().first()
-    if not db_habit:
-        raise HTTPException(status_code=404, detail="Habit not found")
-    for key, value in habit.dict().items():
-        setattr(db_habit, key, value)
-    await db.commit()
-    await db.refresh(db_habit)
-    return db_habit
+    try:
+        email = auth.get_current_user(token, db)
+        user = await auth.get_user_by_email(db, email)
+        if not user:
+            logger.warning(f"User not found for email: {email}")
+            raise HTTPException(status_code=404, detail="User not found")
+        result = await db.execute(select(models.Habit).where(models.Habit.id == habit_id, models.Habit.user_id == user.id))
+        db_habit = result.scalars().first()
+        if not db_habit:
+            logger.warning(f"Habit {habit_id} not found for user {user.id}")
+            raise HTTPException(status_code=404, detail="Habit not found")
+        for key, value in habit.dict().items():
+            setattr(db_habit, key, value)
+        await db.commit()
+        await db.refresh(db_habit)
+        logger.info(f"Updated habit {habit_id} for user {user.id}")
+        return db_habit
+    except Exception as e:
+        logger.error(f"Error updating habit: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.delete("/habits/{habit_id}")
 async def delete_habit(habit_id: int, token: str = Depends(auth.oauth2_scheme), db: AsyncSession = Depends(database.get_db)):
-    email = auth.get_current_user(token, db)
-    user = await auth.get_user_by_email(db, email)
-    result = await db.execute(select(models.Habit).where(models.Habit.id == habit_id, models.Habit.user_id == user.id))
-    db_habit = result.scalars().first()
-    if not db_habit:
-        raise HTTPException(status_code=404, detail="Habit not found")
-    await db.delete(db_habit)
-    await db.commit()
-    return {"ok": True}
+    try:
+        email = auth.get_current_user(token, db)
+        user = await auth.get_user_by_email(db, email)
+        if not user:
+            logger.warning(f"User not found for email: {email}")
+            raise HTTPException(status_code=404, detail="User not found")
+        result = await db.execute(select(models.Habit).where(models.Habit.id == habit_id, models.Habit.user_id == user.id))
+        db_habit = result.scalars().first()
+        if not db_habit:
+            logger.warning(f"Habit {habit_id} not found for user {user.id}")
+            raise HTTPException(status_code=404, detail="Habit not found")
+        await db.delete(db_habit)
+        await db.commit()
+        logger.info(f"Deleted habit {habit_id} for user {user.id}")
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"Error deleting habit: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @app.post("/habits/{habit_id}/track", response_model=schemas.HabitTracking)
 async def track_habit(habit_id: int, tracking: schemas.HabitTrackingCreate, token: str = Depends(auth.oauth2_scheme), db: AsyncSession = Depends(database.get_db)):
-    email = auth.get_current_user(token, db)
-    user = await auth.get_user_by_email(db, email)
-    result = await db.execute(select(models.Habit).where(models.Habit.id == habit_id, models.Habit.user_id == user.id))
-    habit = result.scalars().first()
-    if not habit:
-        raise HTTPException(status_code=404, detail="Habit not found")
-    new_tracking = models.HabitTracking(habit_id=habit.id, **tracking.dict())
-    db.add(new_tracking)
-    await db.commit()
-    await db.refresh(new_tracking)
-    return new_tracking
+    try:
+        email = auth.get_current_user(token, db)
+        user = await auth.get_user_by_email(db, email)
+        if not user:
+            logger.warning(f"User not found for email: {email}")
+            raise HTTPException(status_code=404, detail="User not found")
+        result = await db.execute(select(models.Habit).where(models.Habit.id == habit_id, models.Habit.user_id == user.id))
+        habit = result.scalars().first()
+        if not habit:
+            logger.warning(f"Habit {habit_id} not found for user {user.id}")
+            raise HTTPException(status_code=404, detail="Habit not found")
+        new_tracking = models.HabitTracking(habit_id=habit.id, **tracking.dict())
+        db.add(new_tracking)
+        await db.commit()
+        await db.refresh(new_tracking)
+        logger.info(f"Tracked habit {habit_id} for user {user.id}")
+        return new_tracking
+    except Exception as e:
+        logger.error(f"Error tracking habit: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
