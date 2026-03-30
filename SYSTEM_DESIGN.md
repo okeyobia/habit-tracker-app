@@ -25,12 +25,12 @@
 
 ```mermaid
 graph TD
-    A[React Frontend (S3/CloudFront)] -->|HTTPS| B(FastAPI Backend)
-    B -->|SQL| C[PostgreSQL (AWS RDS)]
-    B -->|Auth| D[JWT / Cognito]
+    A[React Frontend: S3/CloudFront] -->|HTTPS| B[FastAPI Backend]
+    B -->|SQL| C[PostgreSQL: AWS RDS]
+    B -->|Auth| D[JWT or Cognito]
     B -->|File Upload| E[AWS S3]
     B -->|Monitoring| F[AWS CloudWatch]
-    B -->|CI/CD| G[GitHub Actions / CodePipeline]
+    B -->|CI/CD| G[GitHub Actions or CodePipeline]
 ```
 
 ## API Structure
